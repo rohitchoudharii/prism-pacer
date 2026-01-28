@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prism Pacer Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="settings-page">
+    <header class="header">
+      <h1 class="title">
+        <span class="icon">⚡</span>
+        Prism Pacer Settings
+      </h1>
+    </header>
+
+    <main class="main">
+      <!-- Visual Pacer Settings -->
+      <section class="section">
+        <h2 class="section-title">
+          <span>━</span>
+          Visual Pacer
+        </h2>
+        
+        <div class="setting-group">
+          <div class="setting-row">
+            <label for="pacer-height">Line Height</label>
+            <div class="setting-control">
+              <input type="range" id="pacer-height" min="2" max="20" value="4">
+              <span class="value-display" id="pacer-height-value">4px</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="pacer-color">Line Color</label>
+            <div class="setting-control">
+              <input type="color" id="pacer-color" value="#3b82f6">
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="pacer-opacity">Opacity</label>
+            <div class="setting-control">
+              <input type="range" id="pacer-opacity" min="0.1" max="1" step="0.1" value="0.6">
+              <span class="value-display" id="pacer-opacity-value">60%</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="pacer-offset">Vertical Offset</label>
+            <div class="setting-control">
+              <input type="range" id="pacer-offset" min="-50" max="50" value="0">
+              <span class="value-display" id="pacer-offset-value">0px</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="pacer-smooth">Smooth Follow</label>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="pacer-smooth" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="pacer-smart">Smart Text Detection</label>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="pacer-smart" checked>
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-hint">Underline text lines only</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="pacer-scroll-fade">Fade on Scroll</label>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="pacer-scroll-fade" checked>
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-hint">Smooth fade vs instant hide</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Page Dimmer Settings -->
+      <section class="section">
+        <h2 class="section-title">
+          <span>◐</span>
+          Page Dimmer
+        </h2>
+        
+        <div class="setting-group">
+          <div class="setting-row">
+            <label for="dimmer-opacity">Dimmer Opacity</label>
+            <div class="setting-control">
+              <input type="range" id="dimmer-opacity" min="0.3" max="0.95" step="0.05" value="0.7">
+              <span class="value-display" id="dimmer-opacity-value">70%</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="dimmer-color">Dimmer Color</label>
+            <div class="setting-control">
+              <input type="color" id="dimmer-color" value="#000000">
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="dimmer-window">Reading Window Height</label>
+            <div class="setting-control">
+              <input type="range" id="dimmer-window" min="30" max="200" value="60">
+              <span class="value-display" id="dimmer-window-value">60px</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="dimmer-transition">Transition Speed</label>
+            <div class="setting-control">
+              <input type="range" id="dimmer-transition" min="0" max="500" step="50" value="100">
+              <span class="value-display" id="dimmer-transition-value">100ms</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="dimmer-scroll-fade">Fade on Scroll</label>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="dimmer-scroll-fade" checked>
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-hint">Smooth fade vs instant hide</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="dimmer-focused-box">Focused Box Mode</label>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="dimmer-focused-box">
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="setting-hint">Adaptive box vs full-width banner</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RSVP Settings -->
+      <section class="section">
+        <h2 class="section-title">
+          <span>📖</span>
+          RSVP Mode
+        </h2>
+        
+        <div class="setting-group">
+          <div class="setting-row">
+            <label for="rsvp-wpm">Words Per Minute</label>
+            <div class="setting-control">
+              <input type="range" id="rsvp-wpm" min="100" max="1000" step="50" value="300">
+              <span class="value-display" id="rsvp-wpm-value">300 WPM</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="rsvp-chunk">Chunk Size</label>
+            <div class="setting-control">
+              <select id="rsvp-chunk">
+                <option value="1">1 word</option>
+                <option value="2">2 words</option>
+                <option value="3">3 words</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="rsvp-fontsize">Font Size</label>
+            <div class="setting-control">
+              <input type="range" id="rsvp-fontsize" min="16" max="64" value="32">
+              <span class="value-display" id="rsvp-fontsize-value">32px</span>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <label for="rsvp-pause">Pause on Punctuation</label>
+            <div class="setting-control">
+              <label class="toggle">
+                <input type="checkbox" id="rsvp-pause" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Keyboard Shortcuts -->
+      <section class="section">
+        <h2 class="section-title">
+          <span>⌨️</span>
+          Keyboard Shortcuts
+        </h2>
+        
+        <div class="keybindings-list" id="keybindings-list">
+          <!-- Keybindings will be populated by JavaScript -->
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <section class="section actions-section">
+        <button class="btn btn-secondary" id="reset-btn">
+          Reset to Defaults
+        </button>
+        <button class="btn btn-primary" id="save-btn">
+          Save Settings
+        </button>
+      </section>
+    </main>
+
+    <!-- Keybinding Editor Modal -->
+    <div class="modal" id="keybinding-modal">
+      <div class="modal-content">
+        <h3 class="modal-title">Set Shortcut</h3>
+        <p class="modal-action" id="modal-action-name">Toggle Pacer</p>
+        <div class="key-capture" id="key-capture">
+          Press your desired key combination...
+        </div>
+        <p class="modal-hint">Press Escape to cancel</p>
+        <div class="modal-buttons">
+          <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="modal-save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

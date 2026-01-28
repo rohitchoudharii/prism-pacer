@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Prism Pacer",
+  "version": "1.0.0",
+  "description": "Enhance your reading focus and speed with visual pacer, page dimming, and RSVP mode",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "lib/storage.js",
+        "content/toast.js",
+        "content/pacer.js",
+        "content/dimmer.js",
+        "content/rsvp.js",
+        "content/keybindings.js",
+        "content/main.js"
+      ],
+      "css": ["content/styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "options_page": "settings/settings.html"
+}

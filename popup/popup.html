@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prism Pacer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup">
+    <header class="header">
+      <h1 class="title">
+        <span class="icon">⚡</span>
+        Prism Pacer
+      </h1>
+    </header>
+
+    <main class="main">
+      <!-- Feature Toggles -->
+      <section class="section">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-icon">━</span>
+            <span class="toggle-label">Visual Pacer</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="pacer-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="shortcut-hint" id="pacer-shortcut"></div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-icon">◐</span>
+            <span class="toggle-label">Page Dimmer</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="dimmer-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="shortcut-hint" id="dimmer-shortcut"></div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- RSVP Section -->
+      <section class="section">
+        <div class="rsvp-info">
+          <span class="section-icon">📖</span>
+          <span class="section-title">RSVP Mode</span>
+        </div>
+        <p class="rsvp-hint">Select text on page, then press <kbd id="rsvp-shortcut"></kbd></p>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Quick Stats -->
+      <section class="section stats-section">
+        <div class="stat">
+          <span class="stat-value" id="words-read">0</span>
+          <span class="stat-label">words read</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="sessions">0</span>
+          <span class="stat-label">sessions</span>
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Settings Link -->
+      <section class="section">
+        <button class="settings-btn" id="settings-btn">
+          <span>⚙️</span>
+          <span>Settings</span>
+        </button>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span class="version">v1.0.0</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

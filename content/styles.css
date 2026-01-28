@@ -1,0 +1,62 @@
+/**
+ * Content script styles for Prism Pacer
+ * Minimal styles - most styling is done inline for isolation
+ */
+
+/* Ensure our elements don't inherit page styles */
+#speed-reader-pacer,
+#speed-reader-dimmer-top,
+#speed-reader-dimmer-bottom,
+#speed-reader-toast,
+#speed-reader-rsvp {
+  all: initial;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+/* Prevent text selection on our UI elements */
+#speed-reader-toast,
+#speed-reader-rsvp {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Smooth transitions for overlays */
+#speed-reader-dimmer-top,
+#speed-reader-dimmer-bottom {
+  will-change: height;
+}
+
+#speed-reader-pacer {
+  will-change: top;
+}
+
+/* RSVP animations */
+#speed-reader-rsvp {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  #speed-reader-toast {
+    border-width: 2px !important;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  #speed-reader-pacer,
+  #speed-reader-dimmer-top,
+  #speed-reader-dimmer-bottom,
+  #speed-reader-toast {
+    transition: none !important;
+  }
+}
