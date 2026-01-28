@@ -11,6 +11,9 @@
   window.speedReaderInitialized = true;
   
   let settings = null;
+  let siteStates = {};
+  let cursorHidden = false;
+  const hostname = window.location.hostname;
   
   /**
    * Initialize the extension
@@ -39,7 +42,8 @@
    */
   async function loadSettings() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['settings'], (result) => {
+      chrome.storage.local.get(['settings', 'siteStates'], (result) => {
+        siteStates = result.siteStates || {};
         if (result.settings) {
           resolve(result.settings);
         } else {
@@ -97,7 +101,8 @@
         increaseWindowHeight: { key: 'ArrowUp', modifiers: ['Alt', 'Shift'] },
         decreaseWindowHeight: { key: 'ArrowDown', modifiers: ['Alt', 'Shift'] },
         increaseOpacity: { key: '=', modifiers: ['Alt', 'Shift'] },
-        decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] }
+        decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] },
+        toggleCursor: { key: 'c', modifiers: ['Alt', 'Shift'] }
       },
       stats: {
         totalWordsRead: 0,
@@ -106,6 +111,40 @@
         lastSessionDate: null
       }
     };
+  }
+  
+  /**
+   * Get effective enabled state for a feature (per-site or global default)
+   */
+  function getEffectiveEnabled(feature) {
+    const siteState = siteStates[hostname];
+    if (siteState && siteState[`${feature}Enabled`] !== undefined) {
+      return siteState[`${feature}Enabled`];
+    }
+    return settings[feature].enabled;
+  }
+  
+  /**
+   * Save per-site state for a feature
+   */
+  async function saveSiteState(feature, enabled) {
+    if (!siteStates[hostname]) {
+      siteStates[hostname] = {};
+    }
+    siteStates[hostname][`${feature}Enabled`] = enabled;
+    await chrome.storage.local.set({ siteStates });
+  }
+  
+  /**
+   * Set cursor visibility
+   */
+  function setCursorHidden(hide) {
+    cursorHidden = hide;
+    if (hide) {
+      document.body.classList.add('prism-pacer-cursor-hidden');
+    } else {
+      document.body.classList.remove('prism-pacer-cursor-hidden');
+    }
   }
   
   /**
@@ -118,13 +157,17 @@
     keybindingManager.register('togglePacer', () => {
       const enabled = pacer.toggle();
       toast.toggle('Visual Pacer', enabled);
-      saveSetting('pacer.enabled', enabled);
+      saveSiteState('pacer', enabled);
     });
     
     keybindingManager.register('toggleDimmer', () => {
       const enabled = dimmer.toggle();
       toast.toggle('Page Dimmer', enabled);
-      saveSetting('dimmer.enabled', enabled);
+      saveSiteState('dimmer', enabled);
+      // Auto-restore cursor when dimmer is disabled
+      if (!enabled) {
+        setCursorHidden(false);
+      }
     });
     
     keybindingManager.register('toggleBoth', () => {
@@ -140,11 +183,13 @@
       } else {
         pacer.disable();
         dimmer.disable();
+        // Auto-restore cursor when dimmer is disabled
+        setCursorHidden(false);
       }
       
       toast.toggle('Pacer + Dimmer', newState);
-      saveSetting('pacer.enabled', newState);
-      saveSetting('dimmer.enabled', newState);
+      saveSiteState('pacer', newState);
+      saveSiteState('dimmer', newState);
     });
     
     keybindingManager.register('disableAll', () => {
@@ -153,9 +198,11 @@
       if (rsvpPlayer.isActive()) {
         rsvpPlayer.exit();
       }
+      // Auto-restore cursor
+      setCursorHidden(false);
       toast.show('All features disabled', '✗');
-      saveSetting('pacer.enabled', false);
-      saveSetting('dimmer.enabled', false);
+      saveSiteState('pacer', false);
+      saveSiteState('dimmer', false);
     });
     
     keybindingManager.register('startRsvp', () => {
@@ -229,6 +276,14 @@
         saveSetting('dimmer.opacity', settings.dimmer.opacity);
       }
     });
+    
+    // Toggle cursor visibility (only when dimmer is active)
+    keybindingManager.register('toggleCursor', () => {
+      if (dimmer.isEnabled()) {
+        setCursorHidden(!cursorHidden);
+        toast.toggle('Cursor', !cursorHidden);
+      }
+    });
   }
   
   /**
@@ -237,7 +292,7 @@
   function applySettings(settings) {
     // Update pacer
     pacer.updateSettings(settings.pacer);
-    if (settings.pacer.enabled) {
+    if (getEffectiveEnabled('pacer')) {
       pacer.enable();
     } else {
       pacer.disable();
@@ -245,10 +300,12 @@
     
     // Update dimmer
     dimmer.updateSettings(settings.dimmer);
-    if (settings.dimmer.enabled) {
+    if (getEffectiveEnabled('dimmer')) {
       dimmer.enable();
     } else {
       dimmer.disable();
+      // Auto-restore cursor when dimmer is disabled
+      setCursorHidden(false);
     }
     
     // Update RSVP settings
@@ -279,9 +336,16 @@
    * Handle storage changes
    */
   function handleStorageChange(changes, namespace) {
-    if (namespace === 'local' && changes.settings) {
-      settings = changes.settings.newValue;
-      applySettings(settings);
+    if (namespace === 'local') {
+      if (changes.settings) {
+        settings = changes.settings.newValue;
+      }
+      if (changes.siteStates) {
+        siteStates = changes.siteStates.newValue || {};
+      }
+      if (changes.settings || changes.siteStates) {
+        applySettings(settings);
+      }
     }
   }
   
@@ -292,6 +356,18 @@
     if (message.type === 'SETTINGS_CHANGED') {
       settings = message.settings;
       applySettings(settings);
+      sendResponse({ success: true });
+    }
+    
+    if (message.type === 'SITE_STATE_CHANGED') {
+      // Update local siteStates and apply
+      if (message.hostname === hostname) {
+        if (!siteStates[hostname]) {
+          siteStates[hostname] = {};
+        }
+        siteStates[hostname][`${message.feature}Enabled`] = message.enabled;
+        applySettings(settings);
+      }
       sendResponse({ success: true });
     }
     

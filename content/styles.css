@@ -60,3 +60,9 @@
     transition: none !important;
   }
 }
+
+/* Hide cursor when toggled (only with dimmer active) */
+body.prism-pacer-cursor-hidden,
+body.prism-pacer-cursor-hidden * {
+  cursor: none !important;
+}

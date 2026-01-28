@@ -5,6 +5,10 @@
 // Platform detection
 const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
+// Current site context
+let currentHostname = null;
+let siteStates = {};
+
 function getModifierSymbol(modifier) {
   const symbols = {
     'Alt': isMac ? '⌥' : 'Alt',
@@ -33,14 +37,45 @@ const wordsRead = document.getElementById('words-read');
 const sessions = document.getElementById('sessions');
 const settingsBtn = document.getElementById('settings-btn');
 
+/**
+ * Get effective enabled state for a feature (per-site or global default)
+ */
+function getEffectiveEnabled(feature, settings) {
+  if (currentHostname && siteStates[currentHostname]?.[`${feature}Enabled`] !== undefined) {
+    return siteStates[currentHostname][`${feature}Enabled`];
+  }
+  return settings[feature]?.enabled || false;
+}
+
 // Load settings and update UI
 async function loadSettings() {
-  const result = await chrome.storage.local.get(['settings']);
+  // Get current tab's hostname
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.url) {
+      try {
+        const url = new URL(tab.url);
+        currentHostname = url.hostname;
+      } catch (e) {
+        // Invalid URL (e.g., chrome:// pages)
+        currentHostname = null;
+      }
+    }
+  } catch (e) {
+    currentHostname = null;
+  }
+  
+  const result = await chrome.storage.local.get(['settings', 'siteStates']);
   const settings = result.settings || getDefaultSettings();
+  siteStates = result.siteStates || {};
+  
+  // Get effective enabled state for current site
+  const pacerEnabled = getEffectiveEnabled('pacer', settings);
+  const dimmerEnabled = getEffectiveEnabled('dimmer', settings);
   
   // Update toggles
-  pacerToggle.checked = settings.pacer?.enabled || false;
-  dimmerToggle.checked = settings.dimmer?.enabled || false;
+  pacerToggle.checked = pacerEnabled;
+  dimmerToggle.checked = dimmerEnabled;
   
   // Update shortcut hints
   pacerShortcut.textContent = `Shortcut: ${formatKeybinding(settings.keybindings?.togglePacer)}`;
@@ -77,20 +112,49 @@ function formatNumber(num) {
   return num.toString();
 }
 
-// Save setting and notify content script
-async function saveSetting(path, value) {
+/**
+ * Save per-site state for a feature
+ */
+async function saveSiteState(feature, enabled) {
+  if (!currentHostname) {
+    // Fall back to global setting if no hostname
+    return saveGlobalSetting(feature, enabled);
+  }
+  
+  const result = await chrome.storage.local.get(['siteStates']);
+  const siteStates = result.siteStates || {};
+  
+  if (!siteStates[currentHostname]) {
+    siteStates[currentHostname] = {};
+  }
+  siteStates[currentHostname][`${feature}Enabled`] = enabled;
+  
+  await chrome.storage.local.set({ siteStates });
+  
+  // Notify content script
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { 
+        type: 'SITE_STATE_CHANGED',
+        hostname: currentHostname,
+        feature,
+        enabled
+      });
+    }
+  } catch (e) {
+    // Tab might not have content script
+  }
+}
+
+/**
+ * Save global setting (fallback for pages without hostname)
+ */
+async function saveGlobalSetting(feature, enabled) {
   const result = await chrome.storage.local.get(['settings']);
   const settings = result.settings || getDefaultSettings();
   
-  // Set nested value
-  const keys = path.split('.');
-  const lastKey = keys.pop();
-  let target = settings;
-  for (const key of keys) {
-    if (!target[key]) target[key] = {};
-    target = target[key];
-  }
-  target[lastKey] = value;
+  settings[feature].enabled = enabled;
   
   await chrome.storage.local.set({ settings });
   
@@ -110,11 +174,11 @@ async function saveSetting(path, value) {
 
 // Event Listeners
 pacerToggle.addEventListener('change', (e) => {
-  saveSetting('pacer.enabled', e.target.checked);
+  saveSiteState('pacer', e.target.checked);
 });
 
 dimmerToggle.addEventListener('change', (e) => {
-  saveSetting('dimmer.enabled', e.target.checked);
+  saveSiteState('dimmer', e.target.checked);
 });
 
 settingsBtn.addEventListener('click', () => {
@@ -123,7 +187,7 @@ settingsBtn.addEventListener('click', () => {
 
 // Listen for storage changes
 chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (namespace === 'local' && changes.settings) {
+  if (namespace === 'local' && (changes.settings || changes.siteStates)) {
     loadSettings();
   }
 });
