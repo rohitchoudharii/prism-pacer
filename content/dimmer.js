@@ -508,7 +508,7 @@ class Dimmer {
     
     this.focusBox.style.top = `${top}px`;
     this.focusBox.style.left = `${this.currentLeft}px`;
-    this.focusBox.style.width = `${this.currentWidth}px`;
+    this.focusBox.style.width = `${this.currentWidth * 1.05}px`;
     this.focusBox.style.height = `${height}px`;
     
     // Show/hide based on detection

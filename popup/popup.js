@@ -5,9 +5,9 @@
 // Platform detection
 const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
-// Current site context
-let currentHostname = null;
-let siteStates = {};
+// Current tab context
+let currentTabId = null;
+let tabState = {};
 
 function getModifierSymbol(modifier) {
   const symbols = {
@@ -38,38 +38,37 @@ const sessions = document.getElementById('sessions');
 const settingsBtn = document.getElementById('settings-btn');
 
 /**
- * Get effective enabled state for a feature (per-site or global default)
+ * Get effective enabled state for a feature (per-tab or global default)
  */
 function getEffectiveEnabled(feature, settings) {
-  if (currentHostname && siteStates[currentHostname]?.[`${feature}Enabled`] !== undefined) {
-    return siteStates[currentHostname][`${feature}Enabled`];
+  if (tabState && tabState[`${feature}Enabled`] !== undefined) {
+    return tabState[`${feature}Enabled`];
   }
   return settings[feature]?.enabled || false;
 }
 
 // Load settings and update UI
 async function loadSettings() {
-  // Get current tab's hostname
+  // Get current tab id
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.url) {
-      try {
-        const url = new URL(tab.url);
-        currentHostname = url.hostname;
-      } catch (e) {
-        // Invalid URL (e.g., chrome:// pages)
-        currentHostname = null;
-      }
-    }
+    currentTabId = tab?.id || null;
   } catch (e) {
-    currentHostname = null;
+    currentTabId = null;
   }
   
-  const result = await chrome.storage.local.get(['settings', 'siteStates']);
+  const result = await chrome.storage.local.get(['settings']);
   const settings = result.settings || getDefaultSettings();
-  siteStates = result.siteStates || {};
+  tabState = {};
+  if (currentTabId !== null) {
+    try {
+      tabState = await chrome.runtime.sendMessage({ type: 'GET_TAB_STATE', tabId: currentTabId }) || {};
+    } catch (e) {
+      tabState = {};
+    }
+  }
   
-  // Get effective enabled state for current site
+  // Get effective enabled state for current tab
   const pacerEnabled = getEffectiveEnabled('pacer', settings);
   const dimmerEnabled = getEffectiveEnabled('dimmer', settings);
   
@@ -94,7 +93,8 @@ function getDefaultSettings() {
     keybindings: {
       togglePacer: { key: 'p', modifiers: ['Alt', 'Shift'] },
       toggleDimmer: { key: 'd', modifiers: ['Alt', 'Shift'] },
-      startRsvp: { key: 'r', modifiers: ['Alt', 'Shift'] }
+      startRsvp: { key: 'r', modifiers: ['Alt', 'Shift'] },
+      convertToMarkdown: { key: 'm', modifiers: ['Alt', 'Shift'] }
     },
     stats: {
       totalWordsRead: 0,
@@ -113,42 +113,28 @@ function formatNumber(num) {
 }
 
 /**
- * Save per-site state for a feature
+ * Save per-tab state for a feature
  */
-async function saveSiteState(feature, enabled) {
-  if (!currentHostname) {
-    // Fall back to global setting if no hostname
+async function saveTabState(feature, enabled) {
+  if (currentTabId === null) {
+    // Fall back to global setting if no tab
     return saveGlobalSetting(feature, enabled);
   }
   
-  const result = await chrome.storage.local.get(['siteStates']);
-  const siteStates = result.siteStates || {};
-  
-  if (!siteStates[currentHostname]) {
-    siteStates[currentHostname] = {};
-  }
-  siteStates[currentHostname][`${feature}Enabled`] = enabled;
-  
-  await chrome.storage.local.set({ siteStates });
-  
-  // Notify content script
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) {
-      chrome.tabs.sendMessage(tab.id, { 
-        type: 'SITE_STATE_CHANGED',
-        hostname: currentHostname,
-        feature,
-        enabled
-      });
-    }
+    await chrome.runtime.sendMessage({
+      type: 'SET_TAB_STATE',
+      tabId: currentTabId,
+      feature,
+      enabled
+    });
   } catch (e) {
     // Tab might not have content script
   }
 }
 
 /**
- * Save global setting (fallback for pages without hostname)
+ * Save global setting (fallback for pages without a tab)
  */
 async function saveGlobalSetting(feature, enabled) {
   const result = await chrome.storage.local.get(['settings']);
@@ -174,11 +160,11 @@ async function saveGlobalSetting(feature, enabled) {
 
 // Event Listeners
 pacerToggle.addEventListener('change', (e) => {
-  saveSiteState('pacer', e.target.checked);
+  saveTabState('pacer', e.target.checked);
 });
 
 dimmerToggle.addEventListener('change', (e) => {
-  saveSiteState('dimmer', e.target.checked);
+  saveTabState('dimmer', e.target.checked);
 });
 
 settingsBtn.addEventListener('click', () => {
@@ -187,7 +173,7 @@ settingsBtn.addEventListener('click', () => {
 
 // Listen for storage changes
 chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (namespace === 'local' && (changes.settings || changes.siteStates)) {
+  if (namespace === 'local' && (changes.settings || changes.tabStates)) {
     loadSettings();
   }
 });

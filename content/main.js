@@ -11,9 +11,10 @@
   window.speedReaderInitialized = true;
   
   let settings = null;
-  let siteStates = {};
+  let tabState = {};
   let cursorHidden = false;
-  const hostname = window.location.hostname;
+  const tabStateRefreshMs = 10000;
+  let lastTabStateCheck = 0;
   
   /**
    * Initialize the extension
@@ -21,6 +22,7 @@
   async function init() {
     // Load settings
     settings = await loadSettings();
+    await refreshTabState();
     
     // Initialize keybindings
     initKeybindings();
@@ -34,6 +36,16 @@
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener(handleMessage);
     
+    // Periodically refresh tab state (covers missed messages)
+    setInterval(async () => {
+      const now = Date.now();
+      if (now - lastTabStateCheck >= tabStateRefreshMs) {
+        lastTabStateCheck = now;
+        await refreshTabState();
+        applySettings(settings);
+      }
+    }, tabStateRefreshMs);
+
     console.log('Prism Pacer initialized');
   }
   
@@ -42,8 +54,7 @@
    */
   async function loadSettings() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['settings', 'siteStates'], (result) => {
-        siteStates = result.siteStates || {};
+      chrome.storage.local.get(['settings'], (result) => {
         if (result.settings) {
           resolve(result.settings);
         } else {
@@ -102,7 +113,8 @@
         decreaseWindowHeight: { key: 'ArrowDown', modifiers: ['Alt', 'Shift'] },
         increaseOpacity: { key: '=', modifiers: ['Alt', 'Shift'] },
         decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] },
-        toggleCursor: { key: 'c', modifiers: ['Alt', 'Shift'] }
+        toggleCursor: { key: 'c', modifiers: ['Alt', 'Shift'] },
+        convertToMarkdown: { key: 'm', modifiers: ['Alt', 'Shift'] }
       },
       stats: {
         totalWordsRead: 0,
@@ -114,25 +126,37 @@
   }
   
   /**
-   * Get effective enabled state for a feature (per-site or global default)
+   * Get effective enabled state for a feature (per-tab or global default)
    */
   function getEffectiveEnabled(feature) {
-    const siteState = siteStates[hostname];
-    if (siteState && siteState[`${feature}Enabled`] !== undefined) {
-      return siteState[`${feature}Enabled`];
+    if (tabState && tabState[`${feature}Enabled`] !== undefined) {
+      return tabState[`${feature}Enabled`];
     }
     return settings[feature].enabled;
   }
   
   /**
-   * Save per-site state for a feature
+   * Save per-tab state for a feature
    */
-  async function saveSiteState(feature, enabled) {
-    if (!siteStates[hostname]) {
-      siteStates[hostname] = {};
-    }
-    siteStates[hostname][`${feature}Enabled`] = enabled;
-    await chrome.storage.local.set({ siteStates });
+  async function saveTabState(feature, enabled) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'SET_TAB_STATE',
+        feature,
+        enabled
+      }, (response) => {
+        resolve(response);
+      });
+    });
+  }
+
+  async function refreshTabState() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'GET_TAB_STATE' }, (response) => {
+        tabState = response || {};
+        resolve(tabState);
+      });
+    });
   }
   
   /**
@@ -157,13 +181,13 @@
     keybindingManager.register('togglePacer', () => {
       const enabled = pacer.toggle();
       toast.toggle('Visual Pacer', enabled);
-      saveSiteState('pacer', enabled);
+      saveTabState('pacer', enabled);
     });
     
     keybindingManager.register('toggleDimmer', () => {
       const enabled = dimmer.toggle();
       toast.toggle('Page Dimmer', enabled);
-      saveSiteState('dimmer', enabled);
+      saveTabState('dimmer', enabled);
       // Auto-restore cursor when dimmer is disabled
       if (!enabled) {
         setCursorHidden(false);
@@ -188,8 +212,8 @@
       }
       
       toast.toggle('Pacer + Dimmer', newState);
-      saveSiteState('pacer', newState);
-      saveSiteState('dimmer', newState);
+      saveTabState('pacer', newState);
+      saveTabState('dimmer', newState);
     });
     
     keybindingManager.register('disableAll', () => {
@@ -201,8 +225,8 @@
       // Auto-restore cursor
       setCursorHidden(false);
       toast.show('All features disabled', '✗');
-      saveSiteState('pacer', false);
-      saveSiteState('dimmer', false);
+      saveTabState('pacer', false);
+      saveTabState('dimmer', false);
     });
     
     keybindingManager.register('startRsvp', () => {
@@ -252,7 +276,7 @@
     
     keybindingManager.register('decreaseWindowHeight', () => {
       if (dimmer.isEnabled()) {
-        settings.dimmer.windowHeight = Math.max(30, settings.dimmer.windowHeight - 10);
+        settings.dimmer.windowHeight = Math.max(20, settings.dimmer.windowHeight - 10);
         dimmer.updateSettings(settings.dimmer);
         toast.adjust('Window Height', `${settings.dimmer.windowHeight}px`);
         saveSetting('dimmer.windowHeight', settings.dimmer.windowHeight);
@@ -284,6 +308,347 @@
         toast.toggle('Cursor', !cursorHidden);
       }
     });
+
+    keybindingManager.register('convertToMarkdown', () => {
+      if (typeof TurndownService === 'undefined') {
+        console.warn('Prism Pacer - Turndown not available');
+        return;
+      }
+
+      startMarkdownPicker();
+    });
+  }
+
+  const markdownPicker = {
+    active: false,
+    overlay: null,
+    highlight: null,
+    tooltip: null,
+    lastTarget: null
+  };
+
+  const markdownPickerSelectors = [
+    'article',
+    'main',
+    'section',
+    'div',
+    '#content',
+    '.content',
+    '.article',
+    '.post',
+    '.entry',
+    '.story',
+    '.readable'
+  ];
+
+  function startMarkdownPicker() {
+    if (markdownPicker.active) {
+      return;
+    }
+
+    markdownPicker.active = true;
+    markdownPicker.overlay = createPickerOverlay();
+    markdownPicker.highlight = createPickerHighlight();
+    markdownPicker.tooltip = createPickerTooltip();
+    document.body.appendChild(markdownPicker.overlay);
+    document.body.appendChild(markdownPicker.highlight);
+    document.body.appendChild(markdownPicker.tooltip);
+
+    document.addEventListener('mousemove', handlePickerMouseMove, true);
+    document.addEventListener('click', handlePickerClick, true);
+    document.addEventListener('keydown', handlePickerKeydown, true);
+  }
+
+  function stopMarkdownPicker() {
+    markdownPicker.active = false;
+    markdownPicker.lastTarget = null;
+    removePickerElement(markdownPicker.overlay);
+    removePickerElement(markdownPicker.highlight);
+    removePickerElement(markdownPicker.tooltip);
+    markdownPicker.overlay = null;
+    markdownPicker.highlight = null;
+    markdownPicker.tooltip = null;
+
+    document.removeEventListener('mousemove', handlePickerMouseMove, true);
+    document.removeEventListener('click', handlePickerClick, true);
+    document.removeEventListener('keydown', handlePickerKeydown, true);
+  }
+
+  function createPickerOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'prism-pacer-md-picker-overlay';
+    overlay.style.cssText = [
+      'position: fixed',
+      'inset: 0',
+      'background: rgba(15, 23, 42, 0.2)',
+      'pointer-events: none',
+      'z-index: 2147483646'
+    ].join(';');
+    return overlay;
+  }
+
+  function createPickerHighlight() {
+    const highlight = document.createElement('div');
+    highlight.className = 'prism-pacer-md-picker-highlight';
+    highlight.style.cssText = [
+      'position: fixed',
+      'border: 2px solid #38bdf8',
+      'box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2)',
+      'background: rgba(56, 189, 248, 0.08)',
+      'pointer-events: none',
+      'z-index: 2147483647'
+    ].join(';');
+    return highlight;
+  }
+
+  function createPickerTooltip() {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'prism-pacer-md-picker-tooltip';
+    tooltip.style.cssText = [
+      'position: fixed',
+      'padding: 6px 10px',
+      'background: rgba(15, 23, 42, 0.9)',
+      'color: #e2e8f0',
+      'font: 12px/1.3 system-ui, sans-serif',
+      'border-radius: 6px',
+      'pointer-events: none',
+      'z-index: 2147483647',
+      'transform: translate(8px, 8px)'
+    ].join(';');
+    return tooltip;
+  }
+
+  function removePickerElement(element) {
+    if (element && element.parentNode) {
+      element.parentNode.removeChild(element);
+    }
+  }
+
+  function handlePickerMouseMove(event) {
+    if (!markdownPicker.active) {
+      return;
+    }
+
+    const target = findPickerTarget(event.target);
+    markdownPicker.lastTarget = target;
+    updatePickerHighlight(target);
+    updatePickerTooltip(event, target);
+  }
+
+  function handlePickerClick(event) {
+    if (!markdownPicker.active) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const target = markdownPicker.lastTarget;
+    if (!target) {
+      console.warn('Prism Pacer - No valid element selected');
+      stopMarkdownPicker();
+      return;
+    }
+
+    const clonedTarget = target.cloneNode(true);
+    normalizeUrlsInElement(clonedTarget, document.baseURI);
+    formatTablesInElement(clonedTarget);
+
+    const turndownService = new TurndownService();
+    if (window.turndownPluginGfm?.gfm) {
+      turndownService.use(window.turndownPluginGfm.gfm);
+    }
+    turndownService.addRule('subscript', {
+      filter: 'sub',
+      replacement(content) {
+        return content ? `<sub>${content}</sub>` : '';
+      }
+    });
+    turndownService.addRule('superscript', {
+      filter: 'sup',
+      replacement(content) {
+        return content ? `<sup>${content}</sup>` : '';
+      }
+    });
+    const markdown = turndownService.turndown(clonedTarget);
+    console.log('Prism Pacer - Markdown output:\n', markdown);
+    stopMarkdownPicker();
+  }
+
+  function handlePickerKeydown(event) {
+    if (!markdownPicker.active) {
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      stopMarkdownPicker();
+    }
+  }
+
+  function findPickerTarget(element) {
+    if (!element) {
+      return null;
+    }
+
+    const selector = markdownPickerSelectors.join(',');
+    const candidate = element.closest(selector);
+    if (!candidate || candidate === document.body || candidate === document.documentElement) {
+      return null;
+    }
+
+    const rect = candidate.getBoundingClientRect();
+    if (rect.width < 120 || rect.height < 80) {
+      return null;
+    }
+
+    return candidate;
+  }
+
+  function updatePickerHighlight(target) {
+    const highlight = markdownPicker.highlight;
+    if (!highlight) {
+      return;
+    }
+
+    if (!target) {
+      highlight.style.display = 'none';
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    highlight.style.display = 'block';
+    highlight.style.top = `${rect.top}px`;
+    highlight.style.left = `${rect.left}px`;
+    highlight.style.width = `${rect.width}px`;
+    highlight.style.height = `${rect.height}px`;
+  }
+
+  function updatePickerTooltip(event, target) {
+    const tooltip = markdownPicker.tooltip;
+    if (!tooltip) {
+      return;
+    }
+
+    if (!target) {
+      tooltip.style.display = 'none';
+      return;
+    }
+
+    const label = buildPickerLabel(target);
+    tooltip.textContent = label;
+    tooltip.style.display = 'block';
+    tooltip.style.top = `${event.clientY}px`;
+    tooltip.style.left = `${event.clientX}px`;
+  }
+
+  function buildPickerLabel(target) {
+    const tag = target.tagName.toLowerCase();
+    const id = target.id ? `#${target.id}` : '';
+    const classList = target.classList.length ? `.${Array.from(target.classList).slice(0, 3).join('.')}` : '';
+    return `${tag}${id}${classList}`;
+  }
+
+  function normalizeUrlsInElement(rootElement, baseUri) {
+    const elements = rootElement.querySelectorAll('a[href], img[src], img[srcset], source[src], source[srcset]');
+    elements.forEach((element) => {
+      if (element.hasAttribute('href')) {
+        const href = element.getAttribute('href');
+        const normalized = normalizeUrl(href, baseUri);
+        if (normalized) {
+          element.setAttribute('href', normalized);
+        }
+      }
+
+      if (element.hasAttribute('src')) {
+        const src = element.getAttribute('src');
+        const normalized = normalizeUrl(src, baseUri);
+        if (normalized) {
+          element.setAttribute('src', normalized);
+        }
+      }
+
+      if (element.hasAttribute('srcset')) {
+        const srcset = element.getAttribute('srcset');
+        const normalized = normalizeSrcset(srcset, baseUri);
+        if (normalized) {
+          element.setAttribute('srcset', normalized);
+        }
+      }
+    });
+  }
+
+  function formatTablesInElement(rootElement) {
+    const cells = rootElement.querySelectorAll('table th, table td');
+    cells.forEach((cell) => {
+      cell.querySelectorAll('ul, ol').forEach((list) => {
+        const items = Array.from(list.querySelectorAll('li'))
+          .map((li) => normalizeCellText(li.textContent))
+          .filter(Boolean);
+        const inline = items.map((item) => `- ${item}`).join(' ');
+        const span = document.createElement('span');
+        span.textContent = inline;
+        list.replaceWith(span);
+      });
+
+      cell.querySelectorAll('p').forEach((p) => {
+        const span = document.createElement('span');
+        span.textContent = normalizeCellText(p.textContent);
+        p.replaceWith(span);
+      });
+
+      const normalized = normalizeCellText(cell.textContent);
+      cell.textContent = normalized;
+    });
+  }
+
+  function normalizeCellText(value) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+
+    return value
+      .replace(/\s+/g, ' ')
+      .replace(/\|/g, '\\|')
+      .trim();
+  }
+
+  function normalizeUrl(value, baseUri) {
+    if (!value || typeof value !== 'string') {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+      return trimmed;
+    }
+
+    try {
+      return new URL(trimmed, baseUri).href;
+    } catch (e) {
+      return trimmed;
+    }
+  }
+
+  function normalizeSrcset(value, baseUri) {
+    if (!value || typeof value !== 'string') {
+      return null;
+    }
+
+    const entries = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+    const normalizedEntries = entries.map((entry) => {
+      const parts = entry.split(/\s+/).filter(Boolean);
+      if (parts.length === 0) {
+        return entry;
+      }
+      const urlPart = parts[0];
+      const descriptor = parts.slice(1).join(' ');
+      const normalizedUrl = normalizeUrl(urlPart, baseUri) || urlPart;
+      return descriptor ? `${normalizedUrl} ${descriptor}` : normalizedUrl;
+    });
+
+    return normalizedEntries.join(', ');
   }
   
   /**
@@ -339,11 +704,6 @@
     if (namespace === 'local') {
       if (changes.settings) {
         settings = changes.settings.newValue;
-      }
-      if (changes.siteStates) {
-        siteStates = changes.siteStates.newValue || {};
-      }
-      if (changes.settings || changes.siteStates) {
         applySettings(settings);
       }
     }
@@ -359,15 +719,10 @@
       sendResponse({ success: true });
     }
     
-    if (message.type === 'SITE_STATE_CHANGED') {
-      // Update local siteStates and apply
-      if (message.hostname === hostname) {
-        if (!siteStates[hostname]) {
-          siteStates[hostname] = {};
-        }
-        siteStates[hostname][`${message.feature}Enabled`] = message.enabled;
-        applySettings(settings);
-      }
+    if (message.type === 'TAB_STATE_CHANGED') {
+      tabState = tabState || {};
+      tabState[`${message.feature}Enabled`] = message.enabled;
+      applySettings(settings);
       sendResponse({ success: true });
     }
     

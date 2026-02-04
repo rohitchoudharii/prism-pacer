@@ -27,6 +27,8 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "lib/turndown.js",
+        "lib/turndown-plugin-gfm.js",
         "lib/storage.js",
         "content/toast.js",
         "content/pacer.js",

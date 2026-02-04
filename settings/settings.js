@@ -50,7 +50,8 @@ const DEFAULT_SETTINGS = {
     decreaseWindowHeight: { key: 'ArrowDown', modifiers: ['Alt', 'Shift'] },
     increaseOpacity: { key: '=', modifiers: ['Alt', 'Shift'] },
     decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] },
-    toggleCursor: { key: 'c', modifiers: ['Alt', 'Shift'] }
+    toggleCursor: { key: 'c', modifiers: ['Alt', 'Shift'] },
+    convertToMarkdown: { key: 'm', modifiers: ['Alt', 'Shift'] }
   },
   stats: {
     totalWordsRead: 0,
@@ -75,7 +76,8 @@ const KEYBINDING_LABELS = {
   decreaseWindowHeight: 'Decrease Window Height',
   increaseOpacity: 'Increase Opacity',
   decreaseOpacity: 'Decrease Opacity',
-  toggleCursor: 'Toggle Cursor'
+  toggleCursor: 'Toggle Cursor',
+  convertToMarkdown: 'Convert DOM to Markdown'
 };
 
 let settings = null;

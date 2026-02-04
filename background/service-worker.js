@@ -50,7 +50,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         increaseWindowHeight: { key: 'ArrowUp', modifiers: ['Alt', 'Shift'] },
         decreaseWindowHeight: { key: 'ArrowDown', modifiers: ['Alt', 'Shift'] },
         increaseOpacity: { key: '=', modifiers: ['Alt', 'Shift'] },
-        decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] }
+        decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] },
+        convertToMarkdown: { key: 'm', modifiers: ['Alt', 'Shift'] }
       },
       stats: {
         totalWordsRead: 0,
@@ -71,6 +72,43 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 // Handle messages from content scripts or popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'GET_TAB_STATE') {
+    chrome.storage.local.get(['tabStates'], (result) => {
+      const tabStates = result.tabStates || {};
+      const tabId = message.tabId || sender.tab?.id;
+      sendResponse(tabId ? tabStates[tabId] || {} : {});
+    });
+    return true;
+  }
+
+  if (message.type === 'SET_TAB_STATE') {
+    chrome.storage.local.get(['tabStates'], async (result) => {
+      const tabStates = result.tabStates || {};
+      const tabId = message.tabId || sender.tab?.id;
+      if (!tabId) {
+        sendResponse({ success: false });
+        return;
+      }
+      if (!tabStates[tabId]) {
+        tabStates[tabId] = {};
+      }
+      tabStates[tabId][`${message.feature}Enabled`] = message.enabled;
+      await chrome.storage.local.set({ tabStates });
+      try {
+        chrome.tabs.sendMessage(tabId, {
+          type: 'TAB_STATE_CHANGED',
+          tabId,
+          feature: message.feature,
+          enabled: message.enabled
+        });
+      } catch (e) {
+        // Tab might not have content script
+      }
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
   if (message.type === 'GET_SETTINGS') {
     chrome.storage.local.get(['settings'], (result) => {
       sendResponse(result.settings);
@@ -91,6 +129,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.local.get(['tabStates'], async (result) => {
+    const tabStates = result.tabStates || {};
+    if (tabStates[tabId]) {
+      delete tabStates[tabId];
+      await chrome.storage.local.set({ tabStates });
+    }
+  });
 });
 
 // Log when service worker starts
