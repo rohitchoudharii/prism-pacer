@@ -71,10 +71,12 @@ async function loadSettings() {
   // Get effective enabled state for current tab
   const pacerEnabled = getEffectiveEnabled('pacer', settings);
   const dimmerEnabled = getEffectiveEnabled('dimmer', settings);
+
   
   // Update toggles
   pacerToggle.checked = pacerEnabled;
   dimmerToggle.checked = dimmerEnabled;
+
   
   // Update shortcut hints
   pacerShortcut.textContent = `Shortcut: ${formatKeybinding(settings.keybindings?.togglePacer)}`;
@@ -90,10 +92,15 @@ function getDefaultSettings() {
   return {
     pacer: { enabled: false },
     dimmer: { enabled: false },
+    controlMode: {
+      mode: 'mouse',
+      keyboardView: 'narrow'
+    },
     keybindings: {
       togglePacer: { key: 'p', modifiers: ['Alt', 'Shift'] },
       toggleDimmer: { key: 'd', modifiers: ['Alt', 'Shift'] },
       startRsvp: { key: 'r', modifiers: ['Alt', 'Shift'] },
+      reselectReadingElement: { key: 's', modifiers: ['Alt', 'Shift'] },
       convertToMarkdown: { key: 'm', modifiers: ['Alt', 'Shift'] }
     },
     stats: {

@@ -8,14 +8,20 @@
 #speed-reader-dimmer-top,
 #speed-reader-dimmer-bottom,
 #speed-reader-toast,
-#speed-reader-rsvp {
+#speed-reader-rsvp,
+.prism-pacer-reading-pin-overlay,
+.prism-pacer-reading-pin-highlight,
+.prism-pacer-reading-pin-tooltip {
   all: initial;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
 /* Prevent text selection on our UI elements */
 #speed-reader-toast,
-#speed-reader-rsvp {
+#speed-reader-rsvp,
+.prism-pacer-reading-pin-overlay,
+.prism-pacer-reading-pin-highlight,
+.prism-pacer-reading-pin-tooltip {
   user-select: none;
   -webkit-user-select: none;
 }

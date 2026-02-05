@@ -28,6 +28,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         scrollFade: true,
         focusedBox: false
       },
+      controlMode: {
+        mode: 'mouse',
+        keyboardView: 'narrow'
+      },
       rsvp: {
         wpm: 300,
         chunkSize: 1,
@@ -51,6 +55,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         decreaseWindowHeight: { key: 'ArrowDown', modifiers: ['Alt', 'Shift'] },
         increaseOpacity: { key: '=', modifiers: ['Alt', 'Shift'] },
         decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] },
+        reselectReadingElement: { key: 's', modifiers: ['Alt', 'Shift'] },
         convertToMarkdown: { key: 'm', modifiers: ['Alt', 'Shift'] }
       },
       stats: {

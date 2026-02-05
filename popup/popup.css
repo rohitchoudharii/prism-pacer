@@ -140,6 +140,21 @@ body {
   padding-left: 12px;
 }
 
+.popup-select {
+  background: #27272a;
+  color: #e4e4e7;
+  border: 1px solid #3f3f46;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.popup-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
 /* RSVP Section */
 .rsvp-info {
   display: flex;

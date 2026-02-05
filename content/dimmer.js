@@ -16,6 +16,7 @@ class Dimmer {
     this.focusBox = null;
     
     this.enabled = false;
+    this.controlMode = 'mouse';
     this.settings = {
       opacity: 0.7,
       color: '#000000',
@@ -59,6 +60,24 @@ class Dimmer {
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleScroll = this.handleScroll.bind(this);
     this.animate = this.animate.bind(this);
+  }
+
+  /**
+   * Set control mode (mouse or keyboard)
+   */
+  setControlMode(mode) {
+    if (!mode || this.controlMode === mode) return;
+    this.controlMode = mode;
+
+    if (this.enabled) {
+      document.removeEventListener('mousemove', this.handleMouseMove);
+      window.removeEventListener('scroll', this.handleScroll);
+
+      if (this.controlMode === 'mouse') {
+        document.addEventListener('mousemove', this.handleMouseMove);
+        window.addEventListener('scroll', this.handleScroll, { passive: true });
+      }
+    }
   }
 
   /**
@@ -267,8 +286,10 @@ class Dimmer {
     // Reset scroll state
     this.isScrolling = false;
     
-    document.addEventListener('mousemove', this.handleMouseMove);
-    window.addEventListener('scroll', this.handleScroll, { passive: true });
+    if (this.controlMode === 'mouse') {
+      document.addEventListener('mousemove', this.handleMouseMove);
+      window.addEventListener('scroll', this.handleScroll, { passive: true });
+    }
     this.startAnimation();
   }
 
@@ -294,6 +315,41 @@ class Dimmer {
     window.removeEventListener('scroll', this.handleScroll);
     this.isScrolling = false;
     this.stopAnimation();
+  }
+
+  /**
+   * Hide dimmer without disabling
+   */
+  hide() {
+    if (this.topOverlay) {
+      this.topOverlay.style.display = 'none';
+    }
+    if (this.bottomOverlay) {
+      this.bottomOverlay.style.display = 'none';
+    }
+    if (this.focusBox) {
+      this.focusBox.style.display = 'none';
+    }
+  }
+
+  /**
+   * Show dimmer elements
+   */
+  show() {
+    if (!this.enabled) return;
+
+    if (this.settings.focusedBox) {
+      if (this.focusBox) {
+        this.focusBox.style.display = 'block';
+      }
+    } else {
+      if (this.topOverlay) {
+        this.topOverlay.style.display = 'block';
+      }
+      if (this.bottomOverlay) {
+        this.bottomOverlay.style.display = 'block';
+      }
+    }
   }
 
   /**

@@ -27,6 +27,10 @@ const DEFAULT_SETTINGS = {
     scrollFade: true,
     focusedBox: false
   },
+  controlMode: {
+    mode: 'mouse',
+    keyboardView: 'narrow'
+  },
   rsvp: {
     wpm: 300,
     chunkSize: 1,
@@ -51,6 +55,7 @@ const DEFAULT_SETTINGS = {
     increaseOpacity: { key: '=', modifiers: ['Alt', 'Shift'] },
     decreaseOpacity: { key: '-', modifiers: ['Alt', 'Shift'] },
     toggleCursor: { key: 'c', modifiers: ['Alt', 'Shift'] },
+    reselectReadingElement: { key: 's', modifiers: ['Alt', 'Shift'] },
     convertToMarkdown: { key: 'm', modifiers: ['Alt', 'Shift'] }
   },
   stats: {
@@ -77,6 +82,7 @@ const KEYBINDING_LABELS = {
   increaseOpacity: 'Increase Opacity',
   decreaseOpacity: 'Decrease Opacity',
   toggleCursor: 'Toggle Cursor',
+  reselectReadingElement: 'Reselect Reading Element',
   convertToMarkdown: 'Convert DOM to Markdown'
 };
 
@@ -116,6 +122,10 @@ const elements = {
   rsvpFontsize: document.getElementById('rsvp-fontsize'),
   rsvpFontsizeValue: document.getElementById('rsvp-fontsize-value'),
   rsvpPause: document.getElementById('rsvp-pause'),
+
+  // Control Mode
+  controlMode: document.getElementById('control-mode'),
+  keyboardView: document.getElementById('keyboard-view'),
   
   // Keybindings
   keybindingsList: document.getElementById('keybindings-list'),
@@ -178,6 +188,19 @@ async function loadSettings() {
 async function saveSettings() {
   await chrome.storage.local.set({ settings });
   showSavedNotification();
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: 'SESSION_CONTROL_MODE',
+        mode: settings.controlMode?.mode || 'mouse',
+        keyboardView: settings.controlMode?.keyboardView || 'narrow'
+      });
+    }
+  } catch (e) {
+    // Tab might not have content script
+  }
 }
 
 /**
@@ -214,6 +237,11 @@ function populateUI() {
   elements.rsvpFontsize.value = settings.rsvp.fontSize;
   elements.rsvpFontsizeValue.textContent = `${settings.rsvp.fontSize}px`;
   elements.rsvpPause.checked = settings.rsvp.pauseOnPunctuation;
+
+  // Control Mode
+  elements.controlMode.value = settings.controlMode?.mode || 'mouse';
+  elements.keyboardView.value = settings.controlMode?.keyboardView || 'narrow';
+  elements.keyboardView.disabled = (settings.controlMode?.mode || 'mouse') !== 'keyboard';
   
   // Keybindings
   renderKeybindings();
@@ -473,6 +501,18 @@ function setupEventListeners() {
   
   elements.rsvpPause.addEventListener('change', (e) => {
     settings.rsvp.pauseOnPunctuation = e.target.checked;
+  });
+
+  // Control Mode
+  elements.controlMode.addEventListener('change', (e) => {
+    if (!settings.controlMode) settings.controlMode = {};
+    settings.controlMode.mode = e.target.value;
+    elements.keyboardView.disabled = settings.controlMode.mode !== 'keyboard';
+  });
+
+  elements.keyboardView.addEventListener('change', (e) => {
+    if (!settings.controlMode) settings.controlMode = {};
+    settings.controlMode.keyboardView = e.target.value;
   });
   
   // Modal

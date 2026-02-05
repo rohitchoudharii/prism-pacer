@@ -12,6 +12,7 @@ class Pacer {
   constructor() {
     this.element = null;
     this.enabled = false;
+    this.controlMode = 'mouse';
     this.settings = {
       height: 4,
       width: '100%',
@@ -67,6 +68,32 @@ class Pacer {
     this.handleScroll = this.handleScroll.bind(this);
     this.animate = this.animate.bind(this);
     this.animateSmart = this.animateSmart.bind(this);
+  }
+
+  /**
+   * Set control mode (mouse or keyboard)
+   */
+  setControlMode(mode) {
+    if (!mode || this.controlMode === mode) return;
+    this.controlMode = mode;
+
+    if (this.enabled) {
+      document.removeEventListener('mousemove', this.handleMouseMove);
+      window.removeEventListener('scroll', this.handleScroll);
+
+      if (this.controlMode === 'mouse') {
+        document.addEventListener('mousemove', this.handleMouseMove);
+        window.addEventListener('scroll', this.handleScroll, { passive: true });
+
+        if (this.settings.smartDetection) {
+          this.startSmartAnimation();
+        } else if (this.settings.smoothFollow) {
+          this.startAnimation();
+        }
+      } else {
+        this.stopAnimation();
+      }
+    }
   }
 
   /**
@@ -147,14 +174,19 @@ class Pacer {
     // Reset scroll state
     this.isScrolling = false;
     
-    document.addEventListener('mousemove', this.handleMouseMove);
-    window.addEventListener('scroll', this.handleScroll, { passive: true });
-    
-    // Start animation loop
-    if (this.settings.smartDetection) {
-      this.startSmartAnimation();
-    } else if (this.settings.smoothFollow) {
-      this.startAnimation();
+    if (this.controlMode === 'mouse') {
+      document.addEventListener('mousemove', this.handleMouseMove);
+      window.addEventListener('scroll', this.handleScroll, { passive: true });
+
+      // Start animation loop
+      if (this.settings.smartDetection) {
+        this.startSmartAnimation();
+      } else if (this.settings.smoothFollow) {
+        this.startAnimation();
+      }
+    } else {
+      this.stopAnimation();
+      this.element.style.opacity = '0';
     }
   }
 
@@ -173,6 +205,26 @@ class Pacer {
     window.removeEventListener('scroll', this.handleScroll);
     this.isScrolling = false;
     this.stopAnimation();
+  }
+
+  /**
+   * Hide pacer without disabling
+   */
+  hide() {
+    if (!this.element) return;
+    this.element.style.opacity = '0';
+    this.element.style.display = 'none';
+    this.isOverText = false;
+    this.lastTextRect = null;
+    this.targetRect = null;
+  }
+
+  /**
+   * Show pacer element
+   */
+  show() {
+    if (!this.element) return;
+    this.element.style.display = 'block';
   }
 
   /**
