@@ -933,9 +933,7 @@
     const nextIndex = keyboardCursor.lineIndex + direction;
     if (nextIndex >= 0 && nextIndex < keyboardCursor.lineRects.length) {
       const nextRect = keyboardCursor.lineRects[nextIndex];
-      const viewportHeight = window.innerHeight;
-      const zoneTop = viewportHeight * 0.1;
-      const zoneBottom = viewportHeight * 0.9;
+      const { zoneTop, zoneBottom } = getReadingZone(getScrollContainer(pinnedElement));
 
       if (direction > 0 && nextRect.bottom >= zoneBottom) {
         pageTurn(1);
@@ -963,9 +961,17 @@
     if (!pinnedElement) return;
 
     lastPageTurnDirection = direction;
-    const viewportHeight = window.innerHeight;
+    const scrollContainer = getScrollContainer(pinnedElement);
+    const viewportHeight = scrollContainer === window
+      ? window.innerHeight
+      : scrollContainer.clientHeight;
     const offset = Math.round(viewportHeight * 0.77) * direction;
-    window.scrollBy({ top: offset, left: 0, behavior: 'auto' });
+
+    if (scrollContainer === window) {
+      window.scrollBy({ top: offset, left: 0, behavior: 'auto' });
+    } else {
+      scrollContainer.scrollBy({ top: offset, left: 0, behavior: 'auto' });
+    }
     resetKeyboardCursor();
     buildVisibleLineCache();
     if (keyboardCursor.lineRects.length === 0) {
@@ -1023,9 +1029,8 @@
     if (!pinnedElement) return;
 
     const rect = pinnedElement.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const zoneTop = viewportHeight * 0.1;
-    const zoneBottom = viewportHeight * 0.9;
+    const scrollContainer = getScrollContainer(pinnedElement);
+    const { zoneTop, zoneBottom } = getReadingZone(scrollContainer);
     const viewTop = Math.max(zoneTop, rect.top);
     const viewBottom = Math.min(zoneBottom, rect.bottom);
     if (viewBottom <= viewTop) {
@@ -1116,6 +1121,51 @@
     keyboardCursor.lineRects = merged;
     keyboardCursor.lastScanTop = scanTop;
     keyboardCursor.lastScanBottom = scanBottom;
+  }
+
+  function getScrollContainer(element) {
+    if (!element) return window;
+
+    let current = element;
+    while (current && current !== document.body) {
+      if (isScrollableContainer(current)) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+
+    return window;
+  }
+
+  function isScrollableContainer(element) {
+    if (!element || element === document.body || element === document.documentElement) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(element);
+    const overflowY = style.overflowY;
+    if (overflowY !== 'auto' && overflowY !== 'scroll') {
+      return false;
+    }
+
+    return element.scrollHeight > element.clientHeight + 1;
+  }
+
+  function getReadingZone(scrollContainer) {
+    if (scrollContainer === window) {
+      const viewportHeight = window.innerHeight;
+      return {
+        zoneTop: viewportHeight * 0.1,
+        zoneBottom: viewportHeight * 0.9
+      };
+    }
+
+    const rect = scrollContainer.getBoundingClientRect();
+    const viewportHeight = scrollContainer.clientHeight;
+    return {
+      zoneTop: rect.top + viewportHeight * 0.1,
+      zoneBottom: rect.top + viewportHeight * 0.9
+    };
   }
 
   function findClosestLineIndex(rect) {
